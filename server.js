@@ -5,8 +5,8 @@ import { COINS, COIN_LABELS, COIN_SYMBOLS, ALLOWED_DAYS, getCryptoPrices, getMar
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const PRICE_TTL_MS = 25_000;
-const CHART_TTL_MS = 30_000;
+const PRICE_TTL_MS = Number(process.env.PRICE_CACHE_TTL_MS) || 25_000;
+const CHART_TTL_MS = Number(process.env.CHART_CACHE_TTL_MS) || 30_000;
 
 const priceCache = { data: null, timestamp: 0 };
 const chartCache = new Map();
@@ -15,7 +15,7 @@ function isFresh(entry, ttl) {
   return Boolean(entry) && Date.now() - entry.timestamp < ttl;
 }
 
-const app = express();
+export const app = express();
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -76,6 +76,8 @@ app.get("/api/history/:coinId", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en http://localhost:${PORT}`);
-});
+if (import.meta.url === `file://${process.argv[1]}`) {
+  app.listen(PORT, () => {
+    console.log(`Servidor escuchando en http://localhost:${PORT}`);
+  });
+}

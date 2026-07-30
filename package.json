@@ -7,7 +7,11 @@
   "license": "MIT",
   "scripts": {
     "start": "node server.js",
-    "cli": "node cli.js"
+    "cli": "node cli.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "express": "^4.21.0"
