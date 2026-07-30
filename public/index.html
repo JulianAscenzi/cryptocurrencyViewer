@@ -24,10 +24,26 @@
             <th>Precio (USD)</th>
             <th>Cambio 24h</th>
             <th>Umbral de alerta (USD)</th>
+            <th>Cantidad</th>
           </tr>
         </thead>
         <tbody id="price-table-body"></tbody>
       </table>
+    </section>
+
+    <section id="portfolio-summary" class="card">
+      <h2>Mi portafolio</h2>
+      <p id="portfolio-empty" class="muted">Agrega cantidades en la tabla para ver el valor de tu portafolio.</p>
+      <dl class="hidden" id="portfolio-values">
+        <div class="portfolio-row">
+          <dt>Valor total</dt>
+          <dd id="portfolio-value">—</dd>
+        </div>
+        <div class="portfolio-row">
+          <dt>Cambio 24h ponderado</dt>
+          <dd id="portfolio-change">—</dd>
+        </div>
+      </dl>
     </section>
 
     <section id="chart-controls">

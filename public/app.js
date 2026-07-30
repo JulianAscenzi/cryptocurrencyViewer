@@ -1,4 +1,5 @@
 const ALERTS_STORAGE_KEY = "cryptoViewer.alerts";
+const HOLDINGS_STORAGE_KEY = "cryptoViewer.holdings";
 const POLL_INTERVAL_MS = 30_000;
 const ALERT_DISMISS_LABEL = "×";
 
@@ -7,6 +8,7 @@ let previousPrices = {};
 let chartInstance = null;
 let currentChartCoin = null;
 let currentChartDays = 7;
+let lastPricesPayload = null;
 
 function formatPrice(value) {
   return value.toLocaleString("en-US", {
@@ -34,11 +36,24 @@ function saveAlerts(alerts) {
   localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
 }
 
+function loadHoldings() {
+  try {
+    return JSON.parse(localStorage.getItem(HOLDINGS_STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveHoldings(holdings) {
+  localStorage.setItem(HOLDINGS_STORAGE_KEY, JSON.stringify(holdings));
+}
+
 async function loadCoinsMeta() {
   const response = await fetch("/api/coins");
   coinsMeta = await response.json();
 
   const alerts = loadAlerts();
+  const holdings = loadHoldings();
   const tbody = document.getElementById("price-table-body");
   const chartCoinSelect = document.getElementById("chart-coin-select");
 
@@ -68,7 +83,18 @@ async function loadCoinsMeta() {
     thresholdInput.addEventListener("change", () => onThresholdChange(coinId, thresholdInput.value));
     thresholdCell.appendChild(thresholdInput);
 
-    row.append(nameCell, priceCell, changeCell, thresholdCell);
+    const holdingsCell = document.createElement("td");
+    const holdingsInput = document.createElement("input");
+    holdingsInput.type = "number";
+    holdingsInput.step = "any";
+    holdingsInput.min = "0";
+    holdingsInput.id = `holdings-input-${coinId}`;
+    holdingsInput.placeholder = "0";
+    holdingsInput.value = holdings[coinId] ?? "";
+    holdingsInput.addEventListener("input", () => onHoldingsChange(coinId, holdingsInput.value));
+    holdingsCell.appendChild(holdingsInput);
+
+    row.append(nameCell, priceCell, changeCell, thresholdCell, holdingsCell);
     tbody.appendChild(row);
 
     const option = document.createElement("option");
@@ -94,6 +120,57 @@ function onThresholdChange(coinId, rawValue) {
   }
 
   saveAlerts(alerts);
+}
+
+function onHoldingsChange(coinId, rawValue) {
+  const holdings = loadHoldings();
+  const value = Number(rawValue);
+
+  if (rawValue === "" || Number.isNaN(value) || value <= 0) {
+    delete holdings[coinId];
+  } else {
+    holdings[coinId] = value;
+  }
+
+  saveHoldings(holdings);
+  renderPortfolioSummary();
+}
+
+function renderPortfolioSummary() {
+  const valueEl = document.getElementById("portfolio-value");
+  const changeEl = document.getElementById("portfolio-change");
+  const emptyEl = document.getElementById("portfolio-empty");
+  const valuesEl = document.getElementById("portfolio-values");
+
+  if (!lastPricesPayload) return;
+
+  const holdings = loadHoldings();
+  const entries = Object.entries(holdings).filter(
+    ([coinId, qty]) => qty > 0 && lastPricesPayload.coins[coinId]
+  );
+
+  if (!entries.length) {
+    emptyEl.classList.remove("hidden");
+    valuesEl.classList.add("hidden");
+    return;
+  }
+
+  emptyEl.classList.add("hidden");
+  valuesEl.classList.remove("hidden");
+
+  let totalValue = 0;
+  let weightedChangeSum = 0;
+  for (const [coinId, qty] of entries) {
+    const coinData = lastPricesPayload.coins[coinId];
+    const value = qty * coinData.usd;
+    totalValue += value;
+    weightedChangeSum += value * coinData.usd_24h_change;
+  }
+  const weightedChange = weightedChangeSum / totalValue;
+
+  valueEl.textContent = formatPrice(totalValue);
+  changeEl.textContent = formatChange(weightedChange);
+  changeEl.className = weightedChange >= 0 ? "positive" : "negative";
 }
 
 function showAlert(coinId, price, threshold, direction) {
@@ -148,6 +225,7 @@ function checkAlertCrossing(coinId, currentPrice) {
 async function pollPrices() {
   const response = await fetch("/api/prices");
   const payload = await response.json();
+  lastPricesPayload = payload;
 
   document.getElementById("last-updated").textContent = `Última actualización: ${new Date(
     payload.updatedAt
@@ -162,6 +240,8 @@ async function pollPrices() {
 
     checkAlertCrossing(coinId, coinData.usd);
   }
+
+  renderPortfolioSummary();
 }
 
 async function loadChart(coinId, days) {
