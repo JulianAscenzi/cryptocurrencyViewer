@@ -1,0 +1,8 @@
+{
+  "name": "cryptocurrencyviewer",
+  "version": "1.0.0",
+  "description": "A cryptocurrency visualizer built to track and analyze real-time data for BTC, ETH, USDT, BNB, and SOL.",
+  "type": "module",
+  "main": "index.js",
+  "license": "MIT"
+}
