@@ -1,3 +1,5 @@
+import { computePortfolioSummary } from "./portfolio.js";
+
 const ALERTS_STORAGE_KEY = "cryptoViewer.alerts";
 const HOLDINGS_STORAGE_KEY = "cryptoViewer.holdings";
 const POLL_INTERVAL_MS = 30_000;
@@ -9,7 +11,11 @@ let chartInstance = null;
 let currentChartCoin = null;
 let currentChartDays = 7;
 let lastPricesPayload = null;
+let pollTimer = null;
 
+// Nota: src/coingecko.js tiene copias equivalentes de formatPrice/formatChange para el
+// servidor/CLI. Es una duplicación intencional: este archivo se sirve como estático sin
+// bundler, así que no hay una forma barata de compartir el módulo con el navegador.
 function formatPrice(value) {
   return value.toLocaleString("en-US", {
     style: "currency",
@@ -24,6 +30,16 @@ function formatChange(value) {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+function showError(message) {
+  const errorBanner = document.getElementById("error-banner");
+  errorBanner.textContent = message;
+  errorBanner.classList.remove("hidden");
+}
+
+function clearError() {
+  document.getElementById("error-banner").classList.add("hidden");
+}
+
 function loadAlerts() {
   try {
     return JSON.parse(localStorage.getItem(ALERTS_STORAGE_KEY)) || {};
@@ -33,7 +49,11 @@ function loadAlerts() {
 }
 
 function saveAlerts(alerts) {
-  localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
+  try {
+    localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
+  } catch (error) {
+    console.error("No se pudo guardar la alerta:", error);
+  }
 }
 
 function loadHoldings() {
@@ -45,11 +65,18 @@ function loadHoldings() {
 }
 
 function saveHoldings(holdings) {
-  localStorage.setItem(HOLDINGS_STORAGE_KEY, JSON.stringify(holdings));
+  try {
+    localStorage.setItem(HOLDINGS_STORAGE_KEY, JSON.stringify(holdings));
+  } catch (error) {
+    console.error("No se pudo guardar el portafolio:", error);
+  }
 }
 
 async function loadCoinsMeta() {
   const response = await fetch("/api/coins");
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la lista de monedas");
+  }
   coinsMeta = await response.json();
 
   const alerts = loadAlerts();
@@ -80,6 +107,7 @@ async function loadCoinsMeta() {
     thresholdInput.id = `alert-input-${coinId}`;
     thresholdInput.placeholder = "Sin alerta";
     thresholdInput.value = alerts[coinId]?.value ?? "";
+    thresholdInput.setAttribute("aria-label", `Umbral de alerta para ${coinsMeta.labels[coinId]} en USD`);
     thresholdInput.addEventListener("change", () => onThresholdChange(coinId, thresholdInput.value));
     thresholdCell.appendChild(thresholdInput);
 
@@ -91,6 +119,7 @@ async function loadCoinsMeta() {
     holdingsInput.id = `holdings-input-${coinId}`;
     holdingsInput.placeholder = "0";
     holdingsInput.value = holdings[coinId] ?? "";
+    holdingsInput.setAttribute("aria-label", `Cantidad de ${coinsMeta.labels[coinId]} en tu portafolio`);
     holdingsInput.addEventListener("input", () => onHoldingsChange(coinId, holdingsInput.value));
     holdingsCell.appendChild(holdingsInput);
 
@@ -145,11 +174,9 @@ function renderPortfolioSummary() {
   if (!lastPricesPayload) return;
 
   const holdings = loadHoldings();
-  const entries = Object.entries(holdings).filter(
-    ([coinId, qty]) => qty > 0 && lastPricesPayload.coins[coinId]
-  );
+  const summary = computePortfolioSummary(holdings, lastPricesPayload.coins);
 
-  if (!entries.length) {
+  if (!summary) {
     emptyEl.classList.remove("hidden");
     valuesEl.classList.add("hidden");
     return;
@@ -158,19 +185,9 @@ function renderPortfolioSummary() {
   emptyEl.classList.add("hidden");
   valuesEl.classList.remove("hidden");
 
-  let totalValue = 0;
-  let weightedChangeSum = 0;
-  for (const [coinId, qty] of entries) {
-    const coinData = lastPricesPayload.coins[coinId];
-    const value = qty * coinData.usd;
-    totalValue += value;
-    weightedChangeSum += value * coinData.usd_24h_change;
-  }
-  const weightedChange = weightedChangeSum / totalValue;
-
-  valueEl.textContent = formatPrice(totalValue);
-  changeEl.textContent = formatChange(weightedChange);
-  changeEl.className = weightedChange >= 0 ? "positive" : "negative";
+  valueEl.textContent = formatPrice(summary.totalValue);
+  changeEl.textContent = formatChange(summary.weightedChange);
+  changeEl.className = summary.weightedChange >= 0 ? "positive" : "negative";
 }
 
 function showAlert(coinId, price, threshold, direction) {
@@ -190,6 +207,7 @@ function showAlert(coinId, price, threshold, direction) {
   const dismiss = document.createElement("button");
   dismiss.type = "button";
   dismiss.textContent = ALERT_DISMISS_LABEL;
+  dismiss.setAttribute("aria-label", "Cerrar");
   dismiss.addEventListener("click", () => {
     entry.remove();
     if (!banner.children.length) {
@@ -223,63 +241,101 @@ function checkAlertCrossing(coinId, currentPrice) {
 }
 
 async function pollPrices() {
-  const response = await fetch("/api/prices");
-  const payload = await response.json();
-  lastPricesPayload = payload;
+  try {
+    const response = await fetch("/api/prices");
+    const payload = await response.json();
 
-  document.getElementById("last-updated").textContent = `Última actualización: ${new Date(
-    payload.updatedAt
-  ).toLocaleTimeString()}${payload.stale ? " (datos previos, CoinGecko no respondió)" : ""}`;
+    if (!response.ok || !payload.coins) {
+      showError(payload.error || "No se pudieron actualizar los precios");
+      return;
+    }
 
-  for (const coinId of coinsMeta.coins) {
-    const coinData = payload.coins[coinId];
-    if (!coinData) continue;
+    clearError();
+    lastPricesPayload = payload;
 
-    document.getElementById(`price-${coinId}`).textContent = formatPrice(coinData.usd);
-    document.getElementById(`change-${coinId}`).textContent = formatChange(coinData.usd_24h_change);
+    document.getElementById("last-updated").textContent = `Última actualización: ${new Date(
+      payload.updatedAt
+    ).toLocaleTimeString()}${payload.stale ? " (datos previos, CoinGecko no respondió)" : ""}`;
 
-    checkAlertCrossing(coinId, coinData.usd);
+    for (const coinId of coinsMeta.coins) {
+      const coinData = payload.coins[coinId];
+      if (!coinData) continue;
+
+      document.getElementById(`price-${coinId}`).textContent = formatPrice(coinData.usd);
+      document.getElementById(`change-${coinId}`).textContent = formatChange(coinData.usd_24h_change);
+
+      checkAlertCrossing(coinId, coinData.usd);
+    }
+
+    renderPortfolioSummary();
+  } catch {
+    showError("No se pudieron actualizar los precios");
   }
-
-  renderPortfolioSummary();
 }
 
 async function loadChart(coinId, days) {
-  const response = await fetch(`/api/history/${coinId}?days=${days}`);
-  const payload = await response.json();
+  try {
+    const response = await fetch(`/api/history/${coinId}?days=${days}`);
+    const payload = await response.json();
 
-  const points = payload.prices.map(([timestamp, price]) => ({ x: timestamp, y: price }));
+    if (!response.ok || !payload.prices) {
+      showError(payload.error || "No se pudo cargar el historial de precios");
+      return;
+    }
 
-  if (chartInstance) {
-    chartInstance.destroy();
-  }
+    clearError();
+    const points = payload.prices.map(([timestamp, price]) => ({ x: timestamp, y: price }));
 
-  const ctx = document.getElementById("price-chart");
-  chartInstance = new Chart(ctx, {
-    type: "line",
-    data: {
-      datasets: [
-        {
-          label: coinsMeta.labels[coinId],
-          data: points,
-          borderColor: "#3b82f6",
-          backgroundColor: "rgba(59, 130, 246, 0.15)",
-          pointRadius: 0,
-          fill: true,
-          tension: 0.2,
-        },
-      ],
-    },
-    options: {
-      scales: {
-        x: { type: "time" },
-        y: { ticks: { callback: (value) => formatPrice(value) } },
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    const ctx = document.getElementById("price-chart");
+    chartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: coinsMeta.labels[coinId],
+            data: points,
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59, 130, 246, 0.15)",
+            pointRadius: 0,
+            fill: true,
+            tension: 0.2,
+          },
+        ],
       },
-    },
-  });
+      options: {
+        scales: {
+          x: { type: "time" },
+          y: { ticks: { callback: (value) => formatPrice(value) } },
+        },
+      },
+    });
+  } catch {
+    showError("No se pudo cargar el historial de precios");
+  }
 }
 
+function startPolling() {
+  clearInterval(pollTimer);
+  pollTimer = setInterval(pollPrices, POLL_INTERVAL_MS);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!coinsMeta) return;
+  if (document.hidden) {
+    clearInterval(pollTimer);
+  } else {
+    pollPrices();
+    startPolling();
+  }
+});
+
 function init() {
+  const loadingIndicator = document.getElementById("loading-indicator");
+
   loadCoinsMeta()
     .then(() => {
       const chartCoinSelect = document.getElementById("chart-coin-select");
@@ -295,10 +351,15 @@ function init() {
         loadChart(currentChartCoin, currentChartDays);
       });
 
-      return Promise.all([pollPrices(), loadChart(currentChartCoin, currentChartDays)]);
+      return Promise.all([pollPrices(), loadChart(currentChartCoin, currentChartDays)]).then(
+        startPolling
+      );
     })
-    .then(() => {
-      setInterval(pollPrices, POLL_INTERVAL_MS);
+    .catch(() => {
+      showError("No se pudo cargar la aplicación. Intenta recargar la página.");
+    })
+    .finally(() => {
+      loadingIndicator.classList.add("hidden");
     });
 }
 

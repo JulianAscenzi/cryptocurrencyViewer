@@ -14,17 +14,19 @@
       <span id="last-updated">Sin datos todavía</span>
     </header>
 
+    <div id="loading-indicator" role="status" aria-live="polite">Cargando datos...</div>
+    <div id="error-banner" class="hidden" role="alert"></div>
     <div id="alert-banner" class="hidden" aria-live="polite"></div>
 
-    <section>
+    <section class="table-wrapper">
       <table id="price-table">
         <thead>
           <tr>
-            <th>Moneda</th>
-            <th>Precio (USD)</th>
-            <th>Cambio 24h</th>
-            <th>Umbral de alerta (USD)</th>
-            <th>Cantidad</th>
+            <th scope="col">Moneda</th>
+            <th scope="col">Precio (USD)</th>
+            <th scope="col">Cambio 24h</th>
+            <th scope="col">Umbral de alerta (USD)</th>
+            <th scope="col">Cantidad</th>
           </tr>
         </thead>
         <tbody id="price-table-body"></tbody>
@@ -67,6 +69,6 @@
       <canvas id="price-chart" height="100"></canvas>
     </section>
 
-    <script src="app.js" defer></script>
+    <script src="app.js" type="module" defer></script>
   </body>
 </html>

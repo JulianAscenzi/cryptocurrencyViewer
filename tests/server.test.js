@@ -108,6 +108,16 @@ test("GET /api/history/:coinId rejects an unsupported days value", async (t) => 
   assert.equal(response.status, 400);
 });
 
+test("GET /api/history/:coinId rejects a non-numeric days value instead of defaulting", async (t) => {
+  const { server, baseUrl } = await startServer();
+  t.after(() => server.close());
+
+  for (const days of ["abc", "", "7abc"]) {
+    const response = await fetch(`${baseUrl}/api/history/bitcoin?days=${days}`);
+    assert.equal(response.status, 400, `expected 400 for days=${JSON.stringify(days)}`);
+  }
+});
+
 test("GET /api/history/:coinId returns prices for a valid request", async (t) => {
   const { server, baseUrl } = await startServer();
   t.after(() => server.close());
@@ -122,4 +132,70 @@ test("GET /api/history/:coinId returns prices for a valid request", async (t) =>
 
   assert.equal(response.status, 200);
   assert.deepEqual(payload.prices, [[1700000000000, 42]]);
+});
+
+test("GET /api/history/:coinId serves from cache on a second request within the TTL", async (t) => {
+  const { server, baseUrl } = await startServer();
+  t.after(() => server.close());
+
+  let callCount = 0;
+  stubCoinGeckoFetch(t, async () => {
+    callCount += 1;
+    return { ok: true, json: async () => ({ prices: [[1700000000000, 42]] }) };
+  });
+
+  await fetch(`${baseUrl}/api/history/bitcoin?days=7`);
+  const second = await fetch(`${baseUrl}/api/history/bitcoin?days=7`);
+  await second.json();
+
+  assert.equal(callCount, 1);
+});
+
+test("GET /api/history/:coinId falls back to stale cached data when CoinGecko fails", async (t) => {
+  const { server, baseUrl } = await startServer({ CHART_CACHE_TTL_MS: "1" });
+  t.after(() => server.close());
+
+  let callCount = 0;
+  stubCoinGeckoFetch(t, async () => {
+    callCount += 1;
+    if (callCount === 1) {
+      return { ok: true, json: async () => ({ prices: [[1700000000000, 42]] }) };
+    }
+    throw new Error("network down");
+  });
+
+  const first = await fetch(`${baseUrl}/api/history/bitcoin?days=7`);
+  await first.json();
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const second = await fetch(`${baseUrl}/api/history/bitcoin?days=7`);
+  const secondPayload = await second.json();
+
+  assert.equal(second.status, 200);
+  assert.equal(secondPayload.stale, true);
+  assert.deepEqual(secondPayload.prices, [[1700000000000, 42]]);
+});
+
+test("GET /api/prices returns a generic error message (not the raw upstream error) when it fails with no cache", async (t) => {
+  const { server, baseUrl } = await startServer();
+  t.after(() => server.close());
+
+  stubCoinGeckoFetch(t, async () => {
+    throw new Error("some internal upstream detail");
+  });
+
+  const response = await fetch(`${baseUrl}/api/prices`);
+  const payload = await response.json();
+
+  assert.equal(response.status, 502);
+  assert.ok(!payload.error.includes("some internal upstream detail"));
+});
+
+test("GET /unknown-route returns a 404 JSON response", async (t) => {
+  const { server, baseUrl } = await startServer();
+  t.after(() => server.close());
+
+  const response = await fetch(`${baseUrl}/api/does-not-exist`);
+  assert.equal(response.status, 404);
 });

@@ -21,9 +21,21 @@ test("formatPrice formats as USD currency", () => {
   assert.equal(formatPrice(1234.5), "$1,234.50");
 });
 
+test("formatPrice returns a placeholder for invalid input", () => {
+  assert.equal(formatPrice(NaN), "N/D");
+  assert.equal(formatPrice(undefined), "N/D");
+  assert.equal(formatPrice("100"), "N/D");
+});
+
 test("formatChange adds a plus sign for non-negative values", () => {
   assert.equal(formatChange(3.2), "+3.20%");
   assert.equal(formatChange(-1.5), "-1.50%");
+});
+
+test("formatChange returns a placeholder for invalid input", () => {
+  assert.equal(formatChange(NaN), "N/D");
+  assert.equal(formatChange(undefined), "N/D");
+  assert.equal(formatChange("3"), "N/D");
 });
 
 test("getMarketChart rejects an unsupported coin id", async () => {
@@ -60,4 +72,19 @@ test("buildPriceRows returns one row per tracked coin with the expected columns"
     assert.ok("Precio (USD)" in row);
     assert.ok("Cambio 24h" in row);
   }
+});
+
+test("buildPriceRows skips coins missing from a partial CoinGecko response", () => {
+  const data = Object.fromEntries(COINS.slice(1).map((id) => [id, { usd: 10, usd_24h_change: 0 }]));
+  const rows = buildPriceRows(data);
+
+  assert.equal(rows.length, COINS.length - 1);
+});
+
+test("buildPriceRows skips coins with a non-numeric usd field", () => {
+  const data = Object.fromEntries(COINS.map((id) => [id, { usd: 10, usd_24h_change: 0 }]));
+  data[COINS[0]] = { usd: undefined, usd_24h_change: 0 };
+  const rows = buildPriceRows(data);
+
+  assert.equal(rows.length, COINS.length - 1);
 });
