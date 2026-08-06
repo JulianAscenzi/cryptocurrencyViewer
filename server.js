@@ -3,7 +3,14 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { COINS, COIN_LABELS, COIN_SYMBOLS, ALLOWED_DAYS, getCryptoPrices, getMarketChart } from "./src/coingecko.js";
+import {
+  COINS,
+  COIN_LABELS,
+  COIN_SYMBOLS,
+  ALLOWED_DAYS,
+  getCryptoPrices,
+  getMarketChart,
+} from "./src/coingecko.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -69,10 +76,19 @@ app.get("/api/prices", async (_req, res) => {
   } catch (error) {
     console.error("Error al obtener precios de CoinGecko:", error);
     if (priceCache.data) {
-      res.json({ updatedAt: new Date(priceCache.timestamp).toISOString(), coins: priceCache.data, stale: true });
+      res.json({
+        updatedAt: new Date(priceCache.timestamp).toISOString(),
+        coins: priceCache.data,
+        stale: true,
+      });
       return;
     }
-    res.status(502).json({ error: genericUpstreamMessage(error, "No se pudo obtener información de precios en este momento") });
+    res.status(502).json({
+      error: genericUpstreamMessage(
+        error,
+        "No se pudo obtener información de precios en este momento"
+      ),
+    });
   }
 });
 
@@ -109,7 +125,12 @@ app.get("/api/history/:coinId", async (req, res) => {
       res.json({ coinId, days, prices: cached.data.prices, stale: true });
       return;
     }
-    res.status(502).json({ error: genericUpstreamMessage(error, "No se pudo obtener el historial de precios en este momento") });
+    res.status(502).json({
+      error: genericUpstreamMessage(
+        error,
+        "No se pudo obtener el historial de precios en este momento"
+      ),
+    });
   }
 });
 

@@ -1,9 +1,7 @@
 // Cálculo puro del resumen de portafolio, sin referencias al DOM, para que se pueda testear
 // con node:test sin necesidad de simular un navegador (ver tests/portfolio.test.js).
 export function computePortfolioSummary(holdings, coinsData) {
-  const entries = Object.entries(holdings).filter(
-    ([coinId, qty]) => qty > 0 && coinsData[coinId]
-  );
+  const entries = Object.entries(holdings).filter(([coinId, qty]) => qty > 0 && coinsData[coinId]);
 
   if (!entries.length) {
     return null;

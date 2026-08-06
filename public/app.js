@@ -107,8 +107,13 @@ async function loadCoinsMeta() {
     thresholdInput.id = `alert-input-${coinId}`;
     thresholdInput.placeholder = "Sin alerta";
     thresholdInput.value = alerts[coinId]?.value ?? "";
-    thresholdInput.setAttribute("aria-label", `Umbral de alerta para ${coinsMeta.labels[coinId]} en USD`);
-    thresholdInput.addEventListener("change", () => onThresholdChange(coinId, thresholdInput.value));
+    thresholdInput.setAttribute(
+      "aria-label",
+      `Umbral de alerta para ${coinsMeta.labels[coinId]} en USD`
+    );
+    thresholdInput.addEventListener("change", () =>
+      onThresholdChange(coinId, thresholdInput.value)
+    );
     thresholdCell.appendChild(thresholdInput);
 
     const holdingsCell = document.createElement("td");
@@ -119,7 +124,10 @@ async function loadCoinsMeta() {
     holdingsInput.id = `holdings-input-${coinId}`;
     holdingsInput.placeholder = "0";
     holdingsInput.value = holdings[coinId] ?? "";
-    holdingsInput.setAttribute("aria-label", `Cantidad de ${coinsMeta.labels[coinId]} en tu portafolio`);
+    holdingsInput.setAttribute(
+      "aria-label",
+      `Cantidad de ${coinsMeta.labels[coinId]} en tu portafolio`
+    );
     holdingsInput.addEventListener("input", () => onHoldingsChange(coinId, holdingsInput.value));
     holdingsCell.appendChild(holdingsInput);
 
@@ -262,7 +270,9 @@ async function pollPrices() {
       if (!coinData) continue;
 
       document.getElementById(`price-${coinId}`).textContent = formatPrice(coinData.usd);
-      document.getElementById(`change-${coinId}`).textContent = formatChange(coinData.usd_24h_change);
+      document.getElementById(`change-${coinId}`).textContent = formatChange(
+        coinData.usd_24h_change
+      );
 
       checkAlertCrossing(coinId, coinData.usd);
     }

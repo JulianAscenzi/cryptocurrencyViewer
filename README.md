@@ -1,6 +1,8 @@
 # Crypto Viewer
 
 ![CI](https://github.com/JulianAscenzi/cryptocurrencyViewer/actions/workflows/ci.yml/badge.svg)
+![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 A cryptocurrency dashboard that tracks and analyzes real-time data for BTC, ETH, USDT, BNB, and SOL, with
 historical charts, price alerts, and a personal portfolio value tracker.
@@ -9,8 +11,8 @@ historical charts, price alerts, and a personal portfolio value tracker.
 
 Live demo: _add your Render URL here after deploying (see [Deployment](#deployment))_
 
-| Live prices, chart, and alerts | Portfolio tracker |
-| --- | --- |
+| Live prices, chart, and alerts         | Portfolio tracker                                 |
+| -------------------------------------- | ------------------------------------------------- |
 | ![Main view](docs/screenshot-main.png) | ![Portfolio panel](docs/screenshot-portfolio.png) |
 
 ## Features
@@ -27,7 +29,8 @@ Live demo: _add your Render URL here after deploying (see [Deployment](#deployme
 - Node.js + Express (REST API, static file serving, in-memory TTL caching with stale-data fallback)
 - Vanilla JavaScript on the client (no framework) + Chart.js for the historical chart
 - [CoinGecko public API](https://www.coingecko.com/en/api) as the data source
-- `node:test` for unit and integration tests, GitHub Actions for CI
+- `node:test` + `c8` for unit/integration tests and coverage, GitHub Actions for CI
+- ESLint (flat config) + Prettier for linting and formatting
 
 ## Architecture
 
@@ -44,9 +47,12 @@ Live demo: _add your Render URL here after deploying (see [Deployment](#deployme
 
 ```
 npm install
-npm start   # runs the web server on http://localhost:3000
-npm run cli # prints current prices in the terminal
-npm test    # runs the test suite
+npm start              # runs the web server on http://localhost:3000
+npm run cli            # prints current prices in the terminal
+npm test               # runs the test suite
+npm run test:coverage  # runs the test suite with a coverage report
+npm run lint           # checks code with ESLint
+npm run format         # checks formatting with Prettier (use format:write to fix)
 ```
 
 ## Deployment

@@ -8,7 +8,11 @@
   "scripts": {
     "start": "node server.js",
     "cli": "node cli.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:coverage": "c8 --reporter=text --reporter=text-summary node --test",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write ."
   },
   "engines": {
     "node": ">=20"
@@ -17,5 +21,13 @@
     "express": "^4.21.0",
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "c8": "^12.0.0",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6"
   }
 }

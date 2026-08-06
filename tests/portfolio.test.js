@@ -4,7 +4,10 @@ import { computePortfolioSummary } from "../public/portfolio.js";
 
 test("computePortfolioSummary returns null when there are no positive holdings", () => {
   assert.equal(computePortfolioSummary({}, {}), null);
-  assert.equal(computePortfolioSummary({ bitcoin: 0 }, { bitcoin: { usd: 100, usd_24h_change: 1 } }), null);
+  assert.equal(
+    computePortfolioSummary({ bitcoin: 0 }, { bitcoin: { usd: 100, usd_24h_change: 1 } }),
+    null
+  );
 });
 
 test("computePortfolioSummary ignores holdings for coins missing from price data", () => {
@@ -31,7 +34,10 @@ test("computePortfolioSummary computes the value-weighted 24h change", () => {
 });
 
 test("computePortfolioSummary guards against division by zero", () => {
-  const result = computePortfolioSummary({ bitcoin: 1 }, { bitcoin: { usd: 0, usd_24h_change: 5 } });
+  const result = computePortfolioSummary(
+    { bitcoin: 1 },
+    { bitcoin: { usd: 0, usd_24h_change: 5 } }
+  );
 
   assert.equal(result.totalValue, 0);
   assert.equal(result.weightedChange, 0);

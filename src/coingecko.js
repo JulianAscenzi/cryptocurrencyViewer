@@ -53,7 +53,7 @@ async function fetchWithTimeout(url, timeoutMs) {
     return await fetch(url, { signal: controller.signal });
   } catch (error) {
     if (error.name === "AbortError") {
-      throw new Error("CoinGecko no respondió a tiempo");
+      throw new Error("CoinGecko no respondió a tiempo", { cause: error });
     }
     throw error;
   } finally {

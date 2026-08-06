@@ -25,7 +25,12 @@ Tests live in `tests/` (`node:test`, no extra test framework) and run in CI via
 - Run the CLI: `npm run cli`
 - Run tests: `npm test` (equivalent to `node --test`, which auto-discovers `**/*.test.js` — don't pass a
   directory path as a positional arg, e.g. `node --test tests/` fails on this Node version)
-- No lint or build step is defined.
+- Run tests with coverage: `npm run test:coverage` (`c8` wrapping `node --test`)
+- Lint: `npm run lint` (ESLint flat config, `eslint.config.js`)
+- Format: `npm run format` to check, `npm run format:write` to fix (Prettier, config in `.prettierrc.json`)
+- No build step is defined.
+- CI (`.github/workflows/ci.yml`) runs lint, format check, and coverage-instrumented tests on Node 20.x and
+  22.x — keep new code passing all three before pushing.
 
 ## Architecture notes
 
@@ -35,8 +40,7 @@ Tests live in `tests/` (`node:test`, no extra test framework) and run in CI via
   add/remove a tracked coin, only this module needs to change — `server.js`, `cli.js`, and `public/app.js`
   (via `/api/coins`) all derive from it.
 - `server.js` exports `app` (for tests) and only calls `app.listen()` when run directly — guarded by
-  `import.meta.url === \`file://${process.argv[1]}\``. Cache TTLs are read from `PRICE_CACHE_TTL_MS` /
-  `CHART_CACHE_TTL_MS` env vars (defaulting to 25s/30s) so tests can force fast cache expiry.
+  `import.meta.url === \`file://${process.argv[1]}\``. Cache TTLs are read from `PRICE_CACHE_TTL_MS`/`CHART_CACHE_TTL_MS` env vars (defaulting to 25s/30s) so tests can force fast cache expiry.
 - `/api/prices` falls back to the last cached data (flagged `stale: true`) if CoinGecko is unreachable and a
   cache entry exists, rather than failing the request — preserve this resilience pattern if touched.
 - Client-side state (alert thresholds, portfolio holdings) is persisted in `localStorage`
